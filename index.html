@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Video + Notes — One Page App</title>
+  <style>
+    :root { --bg:#0f1724; --card:#0b1220; --muted:#9aa6b2; --accent:#06b6d4; --glass: rgba(255,255,255,0.03);}
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, Arial; background:linear-gradient(180deg,#071028 0%, #021021 100%); color:#e6f0f2}
+    .container{display:flex;gap:18px;padding:18px;height:100%;box-sizing:border-box}
+    .left,.right{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 20px rgba(2,6,23,0.6);display:flex;flex-direction:column}
+    .left{flex:1;min-width:360px}
+    .right{width:420px;max-width:46%;min-width:300px}
+    .top-row{display:flex;gap:8px;align-items:center}
+    input.url{flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:var(--glass);color:inherit}
+    button{background:var(--accent);border:none;color:#012;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+    .player-wrap{margin-top:12px;flex:1;display:flex;border-radius:10px;overflow:hidden;background:#000;align-items:center;justify-content:center;min-height:280px}
+    iframe, video{width:100%;height:100%;display:block;border:0}
+    .controls{display:flex;gap:8px;margin-top:10px;align-items:center}
+    .small-btn{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);padding:8px 10px;border-radius:8px;cursor:pointer}
+    label.toggle{display:flex;gap:8px;align-items:center;margin-left:auto;color:var(--muted)}
+    textarea.notes{width:100%;height:100%;resize:none;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;padding:10px;box-sizing:border-box}
+    .bottom-row{display:flex;gap:8px;align-items:center;margin-top:8px}
+    .meta{font-size:13px;color:var(--muted)}
+    .hint{font-size:13px;color:var(--muted);margin-top:8px}
+    @media(max-width:900px){.container{flex-direction:column}.right{width:auto}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="left">
+      <div class="top-row">
+        <input id="videoUrl" class="url" placeholder="Paste YouTube link (youtube.com/watch?v=...) or direct mp4 link and press Load" />
+        <button id="loadBtn">Load</button>
+        <button id="playPauseBtn" class="small-btn">Play / Pause</button>
+        <button id="backBtn" class="small-btn">⟲ -10s</button>
+        <button id="fwdBtn" class="small-btn">⟳ +10s</button>
+        <label class="toggle"><input id="logToggle" type="checkbox"> Log actions to notes</label>
+      </div>
+
+      <div class="player-wrap" id="playerWrap">
+        <!-- Video or iframe will be inserted here -->
+        <div id="placeholder" style="color:var(--muted);padding:16px;text-align:center">
+          Paste a video URL (YouTube or direct .mp4) and click <strong>Load</strong>.
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="meta" id="timeMeta">00:00 / 00:00</div>
+        <div style="margin-left:auto" class="hint">Shortcuts: <strong>Shift+Space</strong> Play/Pause, <strong>Shift+→</strong> +10s, <strong>Shift+←</strong> -10s</div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="font-weight:700">Notes</div>
+        <div style="margin-left:auto">
+          <button id="exportBtn" class="small-btn">Export .txt</button>
+        </div>
+      </div>
+      <textarea id="notes" class="notes" placeholder="Type notes here..."></textarea>
+      <div class="bottom-row">
+        <button id="clearNotes" class="small-btn">Clear</button>
+        <button id="insertTimestamp" class="small-btn">Insert time</button>
+        <div style="margin-left:auto" class="meta">Notes auto-append when logging ON</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <script>
+    // State
+    let isYouTube = false;
+    let ytPlayer = null;
+    let htmlVideo = null;
+    const playerWrap = document.getElementById('playerWrap');
+    const videoUrlInput = document.getElementById('videoUrl');
+    const loadBtn = document.getElementById('loadBtn');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const backBtn = document.getElementById('backBtn');
+    const fwdBtn = document.getElementById('fwdBtn');
+    const logToggle = document.getElementById('logToggle');
+    const notes = document.getElementById('notes');
+    const exportBtn = document.getElementById('exportBtn');
+    const clearNotes = document.getElementById('clearNotes');
+    const insertTimestamp = document.getElementById('insertTimestamp');
+    const timeMeta = document.getElementById('timeMeta');
+    const placeholder = document.getElementById('placeholder');
+
+    const SEEK_STEP = 10; // seconds
+
+    function clearPlayer() {
+      // remove existing player elements
+      if (ytPlayer && typeof ytPlayer.destroy === 'function') {
+        try { ytPlayer.destroy(); } catch(e){}
+        ytPlayer = null;
+      }
+      if (htmlVideo) {
+        try { htmlVideo.pause(); } catch(e){}
+        htmlVideo.remove();
+        htmlVideo = null;
+      }
+      playerWrap.innerHTML = '';
+    }
+
+    function formatTime(s) {
+      if (!isFinite(s) || s < 0) return '00:00';
+      s = Math.floor(s);
+      const m = Math.floor(s/60).toString().padStart(2,'0');
+      const sec = (s%60).toString().padStart(2,'0');
+      return m + ':' + sec;
+    }
+
+    function updateMeta() {
+      if (isYouTube && ytPlayer) {
+        try {
+          const dur = ytPlayer.getDuration() || 0;
+          const cur = ytPlayer.getCurrentTime() || 0;
+          timeMeta.textContent = formatTime(cur) + ' / ' + formatTime(dur);
+        } catch(e){}
+      } else if (htmlVideo) {
+        const dur = htmlVideo.duration || 0;
+        const cur = htmlVideo.currentTime || 0;
+        timeMeta.textContent = formatTime(cur) + ' / ' + formatTime(dur);
+      } else {
+        timeMeta.textContent = '00:00 / 00:00';
+      }
+    }
+
+    // Poll to update time (for UI)
+    setInterval(updateMeta, 500);
+
+    // Load button handler
+    loadBtn.addEventListener('click', () => {
+      const url = videoUrlInput.value.trim();
+      if (!url) { alert('Please paste a video URL.'); return; }
+      loadVideo(url);
+    });
+
+    function isYouTubeUrl(url) {
+      return /youtube\.com\/watch|youtu\.be\//i.test(url);
+    }
+
+    function extractYouTubeId(url) {
+      // simple regex to capture v= or youtu.be/ id
+      let m = url.match(/[?&]v=([^&]+)/);
+      if (m && m[1]) return m[1];
+      m = url.match(/youtu\.be\/([^?&]+)/);
+      if (m && m[1]) return m[1];
+      return null;
+    }
+
+    function loadVideo(url) {
+      clearPlayer();
+      placeholder.style.display = 'none';
+      if (isYouTubeUrl(url)) {
+        isYouTube = true;
+        const vid = extractYouTubeId(url);
+        if (!vid) { alert('Could not extract YouTube ID'); return; }
+        // create iframe container
+        const div = document.createElement('div');
+        div.id = 'yt-player';
+        div.style.width = '100%';
+        div.style.height = '100%';
+        playerWrap.appendChild(div);
+        // create yt player when API ready (or immediately if available)
+        createYouTubePlayer(vid);
+      } else {
+        isYouTube = false;
+        // create HTML5 video element
+        htmlVideo = document.createElement('video');
+        htmlVideo.controls = false;
+        htmlVideo.src = url;
+        htmlVideo.style.background = '#000';
+        htmlVideo.playsInline = true;
+        htmlVideo.crossOrigin = 'anonymous';
+        htmlVideo.autoplay = false;
+        htmlVideo.preload = 'metadata';
+        playerWrap.appendChild(htmlVideo);
+        htmlVideo.addEventListener('error', ()=>{ alert('Failed to load video. Make sure the URL is a direct video (.mp4) link or CORS allows loading.');});
+        htmlVideo.addEventListener('loadedmetadata', updateMeta);
+        htmlVideo.addEventListener('timeupdate', updateMeta);
+      }
+    }
+
+    // YouTube API integration
+    function createYouTubePlayer(videoId) {
+      // If API is ready
+      if (window.YT && window.YT.Player) {
+        ytPlayer = new YT.Player('yt-player', {
+          videoId,
+          playerVars: { 'rel':0, 'playsinline':1 },
+          events: {
+            onReady: function() { updateMeta(); },
+            onStateChange: function(e){ updateMeta(); }
+          }
+        });
+      } else {
+        // wait until API ready: it will call onYouTubeIframeAPIReady
+        window._pendingYT = videoId;
+      }
+    }
+
+    // global callback used by the YT script
+    function onYouTubeIframeAPIReady() {
+      if (window._pendingYT) {
+        createYouTubePlayer(window._pendingYT);
+        window._pendingYT = null;
+      }
+    }
+    // expose to global
+    window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+
+    // Control helpers
+    function playPause() {
+      if (isYouTube && ytPlayer) {
+        const state = ytPlayer.getPlayerState();
+        // states: -1 unstarted, 0 ended, 1 playing, 2 paused
+        if (state === 1) { ytPlayer.pauseVideo(); actionLog('Pause'); }
+        else { ytPlayer.playVideo(); actionLog('Play'); }
+      } else if (htmlVideo) {
+        if (htmlVideo.paused) { htmlVideo.play(); actionLog('Play'); }
+        else { htmlVideo.pause(); actionLog('Pause'); }
+      }
+    }
+    function seekBy(deltaSec) {
+      if (isYouTube && ytPlayer) {
+        const cur = ytPlayer.getCurrentTime() || 0;
+        ytPlayer.seekTo(Math.max(0, cur + deltaSec), true);
+        actionLog((deltaSec>0?`Forward ${deltaSec}s`:`Back ${Math.abs(deltaSec)}s`));
+      } else if (htmlVideo) {
+        const cur = htmlVideo.currentTime || 0;
+        htmlVideo.currentTime = Math.max(0, cur + deltaSec);
+        actionLog((deltaSec>0?`Forward ${deltaSec}s`:`Back ${Math.abs(deltaSec)}s`));
+      }
+    }
+
+    // Buttons
+    playPauseBtn.addEventListener('click', playPause);
+    fwdBtn.addEventListener('click', ()=>seekBy(SEEK_STEP));
+    backBtn.addEventListener('click', ()=>seekBy(-SEEK_STEP));
+
+    // Keyboard shortcuts (Shift + keys)
+    window.addEventListener('keydown', (e)=>{
+      if (!e.shiftKey) return;
+      // Shift + Space
+      if (e.code === 'Space') {
+        e.preventDefault();
+        playPause();
+      }
+      // Shift + ArrowRight
+      if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        seekBy(SEEK_STEP);
+      }
+      // Shift + ArrowLeft
+      if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        seekBy(-SEEK_STEP);
+      }
+    });
+
+    // Logging actions to notes
+    function getCurrentTimeString() {
+      if (isYouTube && ytPlayer) {
+        try { return formatTime(ytPlayer.getCurrentTime() || 0); } catch(e){ return '00:00'; }
+      } else if (htmlVideo) {
+        return formatTime(htmlVideo.currentTime || 0);
+      }
+      return '00:00';
+    }
+    function actionLog(actionText) {
+      if (!logToggle.checked) return;
+      const stamp = getCurrentTimeString();
+      const text = `[${stamp}] ${actionText}\n`;
+      notes.value = notes.value + text;
+      // keep cursor at bottom
+      notes.scrollTop = notes.scrollHeight;
+    }
+
+    // Export notes
+    exportBtn.addEventListener('click', ()=>{
+      const blob = new Blob([notes.value], {type:'text/plain;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'notes.txt';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    clearNotes.addEventListener('click', ()=>{ if (confirm('Clear all notes?')) notes.value = ''; });
+
+    insertTimestamp.addEventListener('click', ()=>{
+      const stamp = getCurrentTimeString();
+      const toInsert = `[${stamp}] `;
+      const start = notes.selectionStart || notes.value.length;
+      const end = notes.selectionEnd || start;
+      notes.setRangeText(toInsert, start, end, 'end');
+      notes.focus();
+    });
+
+    // Optional: auto-save notes to localStorage to avoid losing work
+    setInterval(()=> {
+      try { localStorage.setItem('videoNotes', notes.value); } catch(e){}
+    }, 2000);
+    window.addEventListener('load', ()=>{
+      try { const saved = localStorage.getItem('videoNotes'); if (saved) notes.value = saved; } catch(e){}
+    });
+
+    // Helpful: if user pastes a YouTube short url like youtu.be/... without protocol
+    videoUrlInput.addEventListener('paste', (ev)=> {
+      // no change — just convenience
+    });
+
+    // Small UX: when clicking play/pause but no player loaded alert
+    function ensurePlayerExists() {
+      if (!isYouTube && !htmlVideo) {
+        alert('Load a video first (paste URL and click Load).');
+        return false;
+      }
+      return true;
+    }
+    // wrap the functions to check
+    const _playPause = playPause;
+    playPauseBtn.onclick = ()=> { if (ensurePlayerExists()) _playPause(); };
+    fwdBtn.onclick = ()=> { if (ensurePlayerExists()) seekBy(SEEK_STEP); };
+    backBtn.onclick = ()=> { if (ensurePlayerExists()) seekBy(-SEEK_STEP); };
+
+    // quick helper: allow pressing Enter in URL input to load
+    videoUrlInput.addEventListener('keydown', (e)=> {
+      if (e.key === 'Enter') { loadBtn.click(); }
+    });
+
+    // analyze: if user wants the same button to also insert names of actions into notes:
+    // This is already implemented via logToggle. When logToggle is ON, each action will append a line to notes with timestamp.
+    // Examples: [00:34] Play, [00:45] Forward 10s
+
+    // End of script
+  </script>
+</body>
+</html>
