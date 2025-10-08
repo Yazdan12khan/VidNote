@@ -1,346 +1,582 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Video + Notes — One Page App</title>
+  <title>VidNote — Video + Time‑Stamped Notes</title>
+  <meta name="description"
+    content="VidNote — watch videos and take time-stamped notes. Play/pause, forward/back, auto-log actions, export notes, responsive UI." />
+
   <style>
-    :root { --bg:#0f1724; --card:#0b1220; --muted:#9aa6b2; --accent:#06b6d4; --glass: rgba(255,255,255,0.03);}
-    html,body{height:100%;margin:0;font-family:Inter, system-ui, Arial; background:linear-gradient(180deg,#071028 0%, #021021 100%); color:#e6f0f2}
-    .container{display:flex;gap:18px;padding:18px;height:100%;box-sizing:border-box}
-    .left,.right{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 20px rgba(2,6,23,0.6);display:flex;flex-direction:column}
-    .left{flex:1;min-width:360px}
-    .right{width:420px;max-width:46%;min-width:300px}
-    .top-row{display:flex;gap:8px;align-items:center}
-    input.url{flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:var(--glass);color:inherit}
-    button{background:var(--accent);border:none;color:#012;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
-    .player-wrap{margin-top:12px;flex:1;display:flex;border-radius:10px;overflow:hidden;background:#000;align-items:center;justify-content:center;min-height:280px}
-    iframe, video{width:100%;height:100%;display:block;border:0}
-    .controls{display:flex;gap:8px;margin-top:10px;align-items:center}
-    .small-btn{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);padding:8px 10px;border-radius:8px;cursor:pointer}
-    label.toggle{display:flex;gap:8px;align-items:center;margin-left:auto;color:var(--muted)}
-    textarea.notes{width:100%;height:100%;resize:none;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;padding:10px;box-sizing:border-box}
-    .bottom-row{display:flex;gap:8px;align-items:center;margin-top:8px}
-    .meta{font-size:13px;color:var(--muted)}
-    .hint{font-size:13px;color:var(--muted);margin-top:8px}
-    @media(max-width:900px){.container{flex-direction:column}.right{width:auto}}
+    /* --------- Theme Variables --------- */
+    :root {
+      /* Dark theme (default) */
+      --bg: #0b1020;
+      --panel: #0f1724;
+      --muted: #9aa6b2;
+      --text: #e6f0f2;
+      --accent: #06b6d4;
+      --glass: rgba(255, 255, 255, 0.03);
+      --success: #16a34a;
+      --danger: #ef4444;
+      --card-radius: 14px;
+      --max-width: 1200px;
+      --shadow: 0 8px 30px rgba(2, 6, 23, 0.6);
+      --border: rgba(255, 255, 255, 0.04);
+    }
+
+    [data-theme="light"] {
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --muted: #64748b;
+      --text: #1e293b;
+      --accent: #0ea5e9;
+      --glass: rgba(0, 0, 0, 0.03);
+      --success: #16a34a;
+      --danger: #ef4444;
+      --shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+      --border: rgba(0, 0, 0, 0.08);
+    }
+
+    /* --------- Base Styles --------- */
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+      background: var(--bg);
+      color: var(--text);
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    /* --------- Layout --------- */
+    .wrap {
+      max-width: var(--max-width);
+      margin: 20px auto;
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--panel);
+      border-radius: var(--card-radius);
+      padding: 14px;
+      box-shadow: var(--shadow);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .left {
+      display: flex;
+      flex-direction: column;
+      min-height: 420px;
+    }
+
+    .right {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* --------- Top controls --------- */
+    .top-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .url {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--glass);
+      color: var(--text);
+      outline: none;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+
+    .btn {
+      background: var(--accent);
+      border: 0;
+      color: #021;
+      padding: 9px 12px;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.1s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .icon-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+
+    .icon-btn:hover {
+      background: var(--glass);
+    }
+
+    /* --------- Player --------- */
+    .player {
+      margin-top: 12px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+      min-height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .placeholder {
+      padding: 22px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    iframe,
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* --------- Controls row --------- */
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .small {
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .small:hover {
+      background: var(--glass);
+    }
+
+    .meta {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .badge {
+      font-size: 12px;
+      padding: 6px 8px;
+      border-radius: 999px;
+      background: var(--glass);
+      color: var(--muted);
+      transition: background-color 0.3s ease;
+    }
+
+    /* --------- Right column (notes + tools) --------- */
+    .notes {
+      flex: 1;
+      min-height: 260px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 100%;
+      resize: none;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      padding: 12px;
+      font-size: 14px;
+      transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .right .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    /* --------- Footer / help --------- */
+    .help {
+      margin-top: 10px;
+      background: var(--glass);
+      padding: 10px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      transition: background-color 0.3s ease;
+    }
+
+    /* --------- Responsive --------- */
+    @media(max-width:1000px) {
+      .wrap {
+        grid-template-columns: 1fr 360px;
+      }
+    }
+
+    @media(max-width:880px) {
+      .wrap {
+        grid-template-columns: 1fr;
+        padding: 12px;
+      }
+
+      .right {
+        order: 2;
+      }
+
+      .left {
+        order: 1;
+      }
+    }
+
+    /* --------- small utilities --------- */
+    .row-between {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chip {
+      background: var(--glass);
+      color: var(--muted);
+      padding: 6px 8px;
+      border-radius: 8px;
+      font-size: 13px;
+      transition: background-color 0.3s ease;
+    }
+
+    /* Theme toggle button */
+    .theme-toggle {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .theme-toggle:hover {
+      background: var(--glass);
+    }
+
+    .theme-icon {
+      width: 16px;
+      height: 16px;
+      transition: transform 0.3s ease;
+    }
+
+    [data-theme="light"] .theme-icon {
+      transform: rotate(180deg);
+    }
   </style>
 </head>
+
 <body>
-  <div class="container">
-    <div class="left">
-      <div class="top-row">
-        <input id="videoUrl" class="url" placeholder="Paste YouTube link (youtube.com/watch?v=...) or direct mp4 link and press Load" />
-        <button id="loadBtn">Load</button>
-        <button id="playPauseBtn" class="small-btn">Play / Pause</button>
-        <button id="backBtn" class="small-btn">⟲ -10s</button>
-        <button id="fwdBtn" class="small-btn">⟳ +10s</button>
-        <label class="toggle"><input id="logToggle" type="checkbox"> Log actions to notes</label>
+  <div class="wrap">
+    <!-- LEFT: Player & controls -->
+    <section class="card left" aria-label="Video player">
+      <div class="top-controls">
+        <input id="videoUrl" class="url" placeholder="Paste YouTube URL or direct .mp4 link and press Load (Enter)"
+          aria-label="video url" />
+        <button id="loadBtn" class="btn" title="Load video">Load</button>
+        <button id="loggingBtn" class="icon-btn" title="Start/Stop auto-logging">Start Logging</button>
+        <button id="themeBtn" class="theme-toggle" title="Toggle theme">
+          <svg class="theme-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M12 16C14.2091 16 16 14.2091 16 12C16 9.79086 14.2091 8 12 8C9.79086 8 8 9.79086 8 12C8 14.2091 9.79086 16 12 16Z"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M12 2V4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M12 20V22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M4.93 4.93L6.34 6.34" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" />
+            <path d="M17.66 17.66L19.07 19.07" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" />
+            <path d="M2 12H4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M20 12H22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M6.34 17.66L4.93 19.07" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" />
+            <path d="M19.07 4.93L17.66 6.34" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+        </button>
       </div>
 
-      <div class="player-wrap" id="playerWrap">
-        <!-- Video or iframe will be inserted here -->
-        <div id="placeholder" style="color:var(--muted);padding:16px;text-align:center">
-          Paste a video URL (YouTube or direct .mp4) and click <strong>Load</strong>.
+      <div id="playerWrap" class="player" role="region" aria-live="polite">
+        <div id="placeholder" class="placeholder">Paste a YouTube link (youtube.com/watch?v=...) or a direct mp4 URL and
+          click <strong>Load</strong>.</div>
+      </div>
+
+      <div class="controls" style="margin-top:12px">
+        <div class="row-between" style="flex:1;gap:8px;align-items:center">
+          <div style="display:flex;gap:8px;align-items:center">
+            <button id="playPauseBtn" class="small">▶ / ❚❚</button>
+            <button id="backBtn" class="small">⟲</button>
+            <button id="fwdBtn" class="small">⟳</button>
+            <div class="chip">Skip: <input id="skipInput" type="number" value="10" min="1" max="600"
+                style="width:70px;margin-left:6px;padding:6px;border-radius:6px;background:transparent;border:1px solid var(--border);color:var(--text)">
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center">
+            <div id="timeMeta" class="meta">00:00 / 00:00</div>
+            <div id="logBadge" class="badge" aria-hidden="true">Logging: OFF</div>
+          </div>
         </div>
       </div>
 
-      <div class="controls">
-        <div class="meta" id="timeMeta">00:00 / 00:00</div>
-        <div style="margin-left:auto" class="hint">Shortcuts: <strong>Shift+Space</strong> Play/Pause, <strong>Shift+→</strong> +10s, <strong>Shift+←</strong> -10s</div>
+      <div class="help" id="howto">
+        <strong>How to use — Quick:</strong>
+        <ol style="padding-left:18px;margin:8px 0">
+          <li>Paste a YouTube link or direct .mp4 URL → <strong>Load</strong> (Enter also works).</li>
+          <li>Use buttons or keyboard shortcuts (Shift+Space play/pause, Shift+→ forward, Shift+← back).
+          </li>
+          <li>Toggle <strong>Start Logging</strong> to auto-insert timestamped actions into Notes.
+          </li>
+          <li>Click <strong>Insert time</strong> in the Notes column to insert current time at cursor.
+          </li>
+          <li>Export notes as .txt / .md / .json from the Notes panel.
+          </li>
+        </ol>
       </div>
-    </div>
+    </section>
 
-    <div class="right">
-      <div style="display:flex;gap:8px;align-items:center">
-        <div style="font-weight:700">Notes</div>
-        <div style="margin-left:auto">
-          <button id="exportBtn" class="small-btn">Export .txt</button>
+    <!-- RIGHT: Notes & tools -->
+    <aside class="card right" aria-label="Notes and tools">
+      <div class="row-between">
+        <div style="font-weight:800">Notes</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="insertTimestamp" class="icon-btn" title="Insert current video time at cursor">Insert time</button>
+          <button id="clearNotes" class="icon-btn" title="Clear notes">Clear</button>
+          <div class="chip muted" id="savedStatus">Saved</div>
         </div>
       </div>
-      <textarea id="notes" class="notes" placeholder="Type notes here..."></textarea>
-      <div class="bottom-row">
-        <button id="clearNotes" class="small-btn">Clear</button>
-        <button id="insertTimestamp" class="small-btn">Insert time</button>
-        <div style="margin-left:auto" class="meta">Notes auto-append when logging ON</div>
+
+      <div class="notes" style="display:flex;flex-direction:column;gap:8px">
+        <textarea id="notes"
+          placeholder="Type your notes here... (timestamps will be appended when logging enabled)"></textarea>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="exportFormat"
+            style="padding:8px;border-radius:8px;background:transparent;border:1px solid var(--border);color:var(--text)">
+            <option value="txt">Export .txt</option>
+            <option value="md">Export .md</option>
+            <option value="json">Export .json</option>
+          </select>
+          <button id="exportBtn" class="btn">Export</button>
+          <button id="saveSession" class="icon-btn">Save session</button>
+          <button id="loadSession" class="icon-btn">Load session</button>
+        </div>
       </div>
-    </div>
+
+      <div class="help" style="margin-top:6px">
+        <strong>Notes features</strong>
+        <ul style="margin:6px 0 0 18px;color:var(--muted)">
+          <li>Auto-save notes & session to localStorage</li>
+          <li>Insert timestamp at cursor with <em>Insert time</em></li>
+          <li>Export in different formats for sharing or GitHub</li>
+        </ul>
+      </div>
+    </aside>
   </div>
 
   <!-- YouTube IFrame API -->
   <script src="https://www.youtube.com/iframe_api"></script>
 
   <script>
-    // State
-    let isYouTube = false;
-    let ytPlayer = null;
-    let htmlVideo = null;
+    // ---------- State & elements ----------
+    let isYouTube = false; let ytPlayer = null; let htmlVideo = null; let logging = false; const SEEK_STEP_DEFAULT = 10;
     const playerWrap = document.getElementById('playerWrap');
     const videoUrlInput = document.getElementById('videoUrl');
     const loadBtn = document.getElementById('loadBtn');
     const playPauseBtn = document.getElementById('playPauseBtn');
     const backBtn = document.getElementById('backBtn');
     const fwdBtn = document.getElementById('fwdBtn');
-    const logToggle = document.getElementById('logToggle');
-    const notes = document.getElementById('notes');
-    const exportBtn = document.getElementById('exportBtn');
-    const clearNotes = document.getElementById('clearNotes');
-    const insertTimestamp = document.getElementById('insertTimestamp');
+    const skipInput = document.getElementById('skipInput');
+    const loggingBtn = document.getElementById('loggingBtn');
+    const logBadge = document.getElementById('logBadge');
     const timeMeta = document.getElementById('timeMeta');
-    const placeholder = document.getElementById('placeholder');
+    const themeBtn = document.getElementById('themeBtn');
 
-    const SEEK_STEP = 10; // seconds
+    const notesEl = document.getElementById('notes');
+    const insertTimestamp = document.getElementById('insertTimestamp');
+    const exportBtn = document.getElementById('exportBtn');
+    const exportFormat = document.getElementById('exportFormat');
+    const clearNotes = document.getElementById('clearNotes');
+    const saveSession = document.getElementById('saveSession');
+    const loadSession = document.getElementById('loadSession');
+    const savedStatus = document.getElementById('savedStatus');
 
-    function clearPlayer() {
-      // remove existing player elements
-      if (ytPlayer && typeof ytPlayer.destroy === 'function') {
-        try { ytPlayer.destroy(); } catch(e){}
-        ytPlayer = null;
-      }
-      if (htmlVideo) {
-        try { htmlVideo.pause(); } catch(e){}
-        htmlVideo.remove();
-        htmlVideo = null;
-      }
-      playerWrap.innerHTML = '';
+    // ---------- Theme Management ----------
+    function getCurrentTheme() {
+      return localStorage.getItem('vidnote_theme') || 'dark';
     }
 
-    function formatTime(s) {
-      if (!isFinite(s) || s < 0) return '00:00';
-      s = Math.floor(s);
-      const m = Math.floor(s/60).toString().padStart(2,'0');
-      const sec = (s%60).toString().padStart(2,'0');
-      return m + ':' + sec;
+    function setTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('vidnote_theme', theme);
     }
+
+    function toggleTheme() {
+      const currentTheme = getCurrentTheme();
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      setTheme(newTheme);
+    }
+
+    // Initialize theme
+    setTheme(getCurrentTheme());
+    themeBtn.addEventListener('click', toggleTheme);
+
+    // ---------- Helpers ----------
+    function formatTime(s) { if (!isFinite(s) || s < 0) return '00:00'; s = Math.floor(s); const m = Math.floor(s / 60).toString().padStart(2, '0'); const sec = (s % 60).toString().padStart(2, '0'); return m + ':' + sec; }
+    function isYouTubeUrl(url) { return /youtube\.com\/watch|youtu\.be\//i.test(url); }
+    function extractYouTubeId(url) { let m = url.match(/[?&]v=([^&]+)/); if (m && m[1]) return m[1]; m = url.match(/youtu\.be\/([^?&]+)/); if (m && m[1]) return m[1]; return null; }
+
+    function clearPlayer() { if (ytPlayer && typeof ytPlayer.destroy === 'function') { try { ytPlayer.destroy() } catch (e) { } ytPlayer = null; } if (htmlVideo) { try { htmlVideo.pause() } catch (e) { } htmlVideo.remove(); htmlVideo = null; } playerWrap.innerHTML = ''; }
+
+    // ---------- UI update ----------
+    function setLogging(state) { logging = !!state; loggingBtn.textContent = logging ? 'Stop Logging' : 'Start Logging'; logBadge.textContent = 'Logging: ' + (logging ? 'ON' : 'OFF'); logBadge.style.background = logging ? 'linear-gradient(90deg,var(--success),#2dd4bf)' : 'var(--glass)'; }
+    setLogging(false);
 
     function updateMeta() {
-      if (isYouTube && ytPlayer) {
-        try {
-          const dur = ytPlayer.getDuration() || 0;
-          const cur = ytPlayer.getCurrentTime() || 0;
-          timeMeta.textContent = formatTime(cur) + ' / ' + formatTime(dur);
-        } catch(e){}
-      } else if (htmlVideo) {
-        const dur = htmlVideo.duration || 0;
-        const cur = htmlVideo.currentTime || 0;
-        timeMeta.textContent = formatTime(cur) + ' / ' + formatTime(dur);
-      } else {
-        timeMeta.textContent = '00:00 / 00:00';
-      }
+      try {
+        if (isYouTube && ytPlayer) { const dur = ytPlayer.getDuration() || 0; const cur = ytPlayer.getCurrentTime() || 0; timeMeta.textContent = formatTime(cur) + ' / ' + formatTime(dur); } else if (htmlVideo) { const dur = htmlVideo.duration || 0; const cur = htmlVideo.currentTime || 0; timeMeta.textContent = formatTime(cur) + ' / ' + formatTime(dur); } else { timeMeta.textContent = '00:00 / 00:00'; }
+      } catch (e) { }
     }
+    setInterval(updateMeta, 400);
 
-    // Poll to update time (for UI)
-    setInterval(updateMeta, 500);
-
-    // Load button handler
-    loadBtn.addEventListener('click', () => {
-      const url = videoUrlInput.value.trim();
-      if (!url) { alert('Please paste a video URL.'); return; }
-      loadVideo(url);
-    });
-
-    function isYouTubeUrl(url) {
-      return /youtube\.com\/watch|youtu\.be\//i.test(url);
-    }
-
-    function extractYouTubeId(url) {
-      // simple regex to capture v= or youtu.be/ id
-      let m = url.match(/[?&]v=([^&]+)/);
-      if (m && m[1]) return m[1];
-      m = url.match(/youtu\.be\/([^?&]+)/);
-      if (m && m[1]) return m[1];
-      return null;
-    }
+    // ---------- Load video ----------
+    loadBtn.addEventListener('click', () => { const url = videoUrlInput.value.trim(); if (!url) { alert('Paste a video URL'); return; } loadVideo(url); });
+    videoUrlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { loadBtn.click(); } });
 
     function loadVideo(url) {
-      clearPlayer();
-      placeholder.style.display = 'none';
+      clearPlayer(); const placeholder = document.getElementById('placeholder'); placeholder && (placeholder.style.display = 'none');
       if (isYouTubeUrl(url)) {
-        isYouTube = true;
-        const vid = extractYouTubeId(url);
-        if (!vid) { alert('Could not extract YouTube ID'); return; }
-        // create iframe container
-        const div = document.createElement('div');
-        div.id = 'yt-player';
-        div.style.width = '100%';
-        div.style.height = '100%';
-        playerWrap.appendChild(div);
-        // create yt player when API ready (or immediately if available)
+        isYouTube = true; const vid = extractYouTubeId(url); if (!vid) { alert('Could not extract YouTube ID'); return; }
+        const div = document.createElement('div'); div.id = 'yt-player'; div.style.width = '100%'; div.style.height = '100%'; playerWrap.appendChild(div);
         createYouTubePlayer(vid);
       } else {
-        isYouTube = false;
-        // create HTML5 video element
-        htmlVideo = document.createElement('video');
-        htmlVideo.controls = false;
-        htmlVideo.src = url;
-        htmlVideo.style.background = '#000';
-        htmlVideo.playsInline = true;
-        htmlVideo.crossOrigin = 'anonymous';
-        htmlVideo.autoplay = false;
-        htmlVideo.preload = 'metadata';
-        playerWrap.appendChild(htmlVideo);
-        htmlVideo.addEventListener('error', ()=>{ alert('Failed to load video. Make sure the URL is a direct video (.mp4) link or CORS allows loading.');});
+        isYouTube = false; htmlVideo = document.createElement('video'); htmlVideo.controls = false; htmlVideo.src = url; htmlVideo.style.background = '#000'; htmlVideo.playsInline = true; htmlVideo.crossOrigin = 'anonymous'; htmlVideo.autoplay = false; htmlVideo.preload = 'metadata'; playerWrap.appendChild(htmlVideo);
+        htmlVideo.addEventListener('error', () => { alert('Failed to load video. Use a direct .mp4 URL or ensure CORS allows loading.'); });
         htmlVideo.addEventListener('loadedmetadata', updateMeta);
         htmlVideo.addEventListener('timeupdate', updateMeta);
       }
     }
 
-    // YouTube API integration
-    function createYouTubePlayer(videoId) {
-      // If API is ready
-      if (window.YT && window.YT.Player) {
-        ytPlayer = new YT.Player('yt-player', {
-          videoId,
-          playerVars: { 'rel':0, 'playsinline':1 },
-          events: {
-            onReady: function() { updateMeta(); },
-            onStateChange: function(e){ updateMeta(); }
-          }
-        });
-      } else {
-        // wait until API ready: it will call onYouTubeIframeAPIReady
-        window._pendingYT = videoId;
-      }
-    }
-
-    // global callback used by the YT script
-    function onYouTubeIframeAPIReady() {
-      if (window._pendingYT) {
-        createYouTubePlayer(window._pendingYT);
-        window._pendingYT = null;
-      }
-    }
-    // expose to global
+    // ---------- YouTube API ----------
+    function createYouTubePlayer(videoId) { if (window.YT && window.YT.Player) { ytPlayer = new YT.Player('yt-player', { videoId, playerVars: { rel: 0, playsinline: 1, modestbranding: 1 }, events: { onReady: function () { updateMeta(); }, onStateChange: function () { updateMeta(); } } }); } else { window._pendingYT = videoId; } }
+    function onYouTubeIframeAPIReady() { if (window._pendingYT) { createYouTubePlayer(window._pendingYT); window._pendingYT = null; } }
     window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
 
-    // Control helpers
-    function playPause() {
-      if (isYouTube && ytPlayer) {
-        const state = ytPlayer.getPlayerState();
-        // states: -1 unstarted, 0 ended, 1 playing, 2 paused
-        if (state === 1) { ytPlayer.pauseVideo(); actionLog('Pause'); }
-        else { ytPlayer.playVideo(); actionLog('Play'); }
-      } else if (htmlVideo) {
-        if (htmlVideo.paused) { htmlVideo.play(); actionLog('Play'); }
-        else { htmlVideo.pause(); actionLog('Pause'); }
-      }
-    }
-    function seekBy(deltaSec) {
-      if (isYouTube && ytPlayer) {
-        const cur = ytPlayer.getCurrentTime() || 0;
-        ytPlayer.seekTo(Math.max(0, cur + deltaSec), true);
-        actionLog((deltaSec>0?`Forward ${deltaSec}s`:`Back ${Math.abs(deltaSec)}s`));
-      } else if (htmlVideo) {
-        const cur = htmlVideo.currentTime || 0;
-        htmlVideo.currentTime = Math.max(0, cur + deltaSec);
-        actionLog((deltaSec>0?`Forward ${deltaSec}s`:`Back ${Math.abs(deltaSec)}s`));
-      }
+    // ---------- Controls: play/pause/seek ----------
+    function currentPlayerExists() { if (!isYouTube && !htmlVideo) { alert('Load a video first (paste URL and click Load).'); return false; } return true; }
+    function playPause() { if (!currentPlayerExists()) return; if (isYouTube && ytPlayer) { const state = ytPlayer.getPlayerState(); if (state === 1) { ytPlayer.pauseVideo(); logAction('Pause'); } else { ytPlayer.playVideo(); logAction('Play'); } } else if (htmlVideo) { if (htmlVideo.paused) { htmlVideo.play(); logAction('Play'); } else { htmlVideo.pause(); logAction('Pause'); } } }
+    function seekBy(delta) {
+      if (!currentPlayerExists()) return; const step = Number(skipInput.value) || SEEK_STEP_DEFAULT; const deltaSec = (Math.sign(delta) || 1) * Math.abs(delta) || step; // support delta param as seconds
+      if (isYouTube && ytPlayer) { const cur = ytPlayer.getCurrentTime() || 0; ytPlayer.seekTo(Math.max(0, cur + delta), true); logAction(delta > 0 ? `Forward ${delta}s` : `Back ${Math.abs(delta)}s`); } else if (htmlVideo) { const cur = htmlVideo.currentTime || 0; htmlVideo.currentTime = Math.max(0, cur + delta); logAction(delta > 0 ? `Forward ${delta}s` : `Back ${Math.abs(delta)}s`); }
     }
 
-    // Buttons
-    playPauseBtn.addEventListener('click', playPause);
-    fwdBtn.addEventListener('click', ()=>seekBy(SEEK_STEP));
-    backBtn.addEventListener('click', ()=>seekBy(-SEEK_STEP));
+    playPauseBtn.addEventListener('click', () => { playPause(); });
+    fwdBtn.addEventListener('click', () => { seekBy(Number(skipInput.value) || 10); });
+    backBtn.addEventListener('click', () => { seekBy(- (Number(skipInput.value) || 10)); });
 
-    // Keyboard shortcuts (Shift + keys)
-    window.addEventListener('keydown', (e)=>{
+    // ---------- Keyboard shortcuts (Shift+Space, Shift+→, Shift+←) ----------
+    window.addEventListener('keydown', (e) => {
       if (!e.shiftKey) return;
-      // Shift + Space
-      if (e.code === 'Space') {
-        e.preventDefault();
-        playPause();
-      }
-      // Shift + ArrowRight
-      if (e.code === 'ArrowRight') {
-        e.preventDefault();
-        seekBy(SEEK_STEP);
-      }
-      // Shift + ArrowLeft
-      if (e.code === 'ArrowLeft') {
-        e.preventDefault();
-        seekBy(-SEEK_STEP);
-      }
+      if (e.code === 'Space') { e.preventDefault(); playPause(); }
+      if (e.code === 'ArrowRight') { e.preventDefault(); seekBy(Number(skipInput.value) || 10); }
+      if (e.code === 'ArrowLeft') { e.preventDefault(); seekBy(- (Number(skipInput.value) || 10)); }
     });
 
-    // Logging actions to notes
-    function getCurrentTimeString() {
-      if (isYouTube && ytPlayer) {
-        try { return formatTime(ytPlayer.getCurrentTime() || 0); } catch(e){ return '00:00'; }
-      } else if (htmlVideo) {
-        return formatTime(htmlVideo.currentTime || 0);
-      }
-      return '00:00';
-    }
-    function actionLog(actionText) {
-      if (!logToggle.checked) return;
-      const stamp = getCurrentTimeString();
-      const text = `[${stamp}] ${actionText}\n`;
-      notes.value = notes.value + text;
-      // keep cursor at bottom
-      notes.scrollTop = notes.scrollHeight;
-    }
+    // ---------- Logging actions to notes ----------
+    function getCurrentTimeString() { try { if (isYouTube && ytPlayer) return formatTime(ytPlayer.getCurrentTime() || 0); if (htmlVideo) return formatTime(htmlVideo.currentTime || 0); } catch (e) { } return '00:00'; }
+    function logAction(actionText) { if (!logging) return; const stamp = getCurrentTimeString(); const line = `[${stamp}] ${actionText}\n`; notesEl.value += line; notesEl.scrollTop = notesEl.scrollHeight; saveAuto(); savedStatus.textContent = 'Saved'; }
 
-    // Export notes
-    exportBtn.addEventListener('click', ()=>{
-      const blob = new Blob([notes.value], {type:'text/plain;charset=utf-8'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'notes.txt';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+    loggingBtn.addEventListener('click', () => { setLogging(!logging); saveAuto(); });
+
+    // ---------- Timestamp insertion & note helpers ----------
+    insertTimestamp.addEventListener('click', () => { const stamp = getCurrentTimeString(); insertAtCursor(notesEl, `[${stamp}] `); notesEl.focus(); saveAuto(); });
+    clearNotes.addEventListener('click', () => { if (confirm('Clear all notes?')) { notesEl.value = ''; saveAuto(); } });
+
+    function insertAtCursor(el, text) { const start = el.selectionStart || el.value.length; const end = el.selectionEnd || start; el.setRangeText(text, start, end, 'end'); }
+
+    // Insert timestamp by typing special sequence (optional): when user types "[[t]]" we'll replace with timestamp
+    notesEl.addEventListener('input', (e) => { try { const val = notesEl.value; const pos = notesEl.selectionStart; const last3 = val.slice(Math.max(0, pos - 5), pos); if (last3.endsWith('[[t')) { /* do nothing until ']]' */ } if (val.includes('[[t]]')) { notesEl.value = val.replace('\n[[t]]', '\n[' + getCurrentTimeString() + ']').replace('[[t]]', '[' + getCurrentTimeString() + ']'); notesEl.selectionStart = notesEl.selectionEnd = notesEl.value.length; saveAuto(); } } catch (e) { } });
+
+    // ---------- Export notes ----------
+    exportBtn.addEventListener('click', () => { const fmt = exportFormat.value; const content = notesEl.value; if (fmt === 'txt' || fmt === 'md') { const ext = fmt === 'md' ? 'md' : 'txt'; downloadFile(content, `notes.${ext}`); } else if (fmt === 'json') { try { const payload = { notes: content, videoUrl: videoUrlInput.value || null, logged: logging, time: new Date().toISOString() }; downloadFile(JSON.stringify(payload, null, 2), 'notes.json'); } catch (e) { alert('Failed to export JSON'); } } });
+    function downloadFile(text, filename) { const blob = new Blob([text], { type: 'text/plain;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
+
+    // ---------- Session save/load & autosave ----------
+    function saveSessionToStorage() { const state = { videoUrl: videoUrlInput.value || null, notes: notesEl.value || '', logging: logging, skip: Number(skipInput.value) || 10, ts: new Date().toISOString() }; localStorage.setItem('vidnote_session', JSON.stringify(state)); savedStatus.textContent = 'Saved'; }
+    function loadSessionFromStorage() { try { const raw = localStorage.getItem('vidnote_session'); if (!raw) { alert('No saved session found'); return; } const s = JSON.parse(raw); videoUrlInput.value = s.videoUrl || ''; notesEl.value = s.notes || ''; setLogging(s.logging); skipInput.value = s.skip || 10; savedStatus.textContent = 'Loaded'; if (s.videoUrl) loadVideo(s.videoUrl); } catch (e) { alert('Failed to load session'); } }
+    saveSession.addEventListener('click', saveSessionToStorage); loadSession.addEventListener('click', loadSessionFromStorage);
+
+    // autosave every 2s
+    function saveAuto() { try { const auto = { videoUrl: videoUrlInput.value || '', notes: notesEl.value || '', logging: logging, skip: Number(skipInput.value) || 10 }; localStorage.setItem('vidnote_autosave', JSON.stringify(auto)); savedStatus.textContent = 'Saved'; } catch (e) { } }
+    setInterval(saveAuto, 2000);
+    window.addEventListener('load', () => { try { const raw = localStorage.getItem('vidnote_autosave'); if (raw) { const s = JSON.parse(raw); videoUrlInput.value = s.videoUrl || ''; notesEl.value = s.notes || ''; setLogging(s.logging); skipInput.value = s.skip || 10; } } catch (e) { } });
+
+    // ---------- Small UX helpers ----------
+    function setLogging(state) { logging = !!state; loggingBtn.textContent = logging ? 'Stop Logging' : 'Start Logging'; logBadge.textContent = 'Logging: ' + (logging ? 'ON' : 'OFF'); logBadge.style.background = logging ? 'linear-gradient(90deg,var(--success),#2dd4bf)' : 'var(--glass)'; }
+
+    // ---------- Utility: get current time for player ----------
+    function getPlayerTime() { try { if (isYouTube && ytPlayer) return ytPlayer.getCurrentTime() || 0; if (htmlVideo) return htmlVideo.currentTime || 0; } catch (e) { } return 0; }
+
+    // ---------- Ensure player exists wrapper for button actions ----------
+    const ensurePlayer = (fn) => { return (...args) => { if (!isYouTube && !htmlVideo) { alert('Load a video first (paste URL and click Load).'); return; } return fn(...args); }; };
+
+    // wrap playPause & seek
+    playPauseBtn.onclick = ensurePlayer(() => playPause());
+    fwdBtn.onclick = ensurePlayer(() => seekBy(Number(skipInput.value) || 10));
+    backBtn.onclick = ensurePlayer(() => seekBy(- (Number(skipInput.value) || 10)));
+
+    // ---------- Extra: allow clicking on notes timestamp to seek ----------
+    // When user clicks a [mm:ss] text in notes, jump to that time
+    notesEl.addEventListener('click', (e) => {
+      const sel = window.getSelection(); if (!sel) return; const text = sel.toString(); const m = text.match(/(\d{2}:\d{2})/); if (m) { const parts = m[1].split(':'); const secs = Number(parts[0]) * 60 + Number(parts[1]); if (isYouTube && ytPlayer) ytPlayer.seekTo(secs, true); else if (htmlVideo) htmlVideo.currentTime = secs; }
     });
 
-    clearNotes.addEventListener('click', ()=>{ if (confirm('Clear all notes?')) notes.value = ''; });
-
-    insertTimestamp.addEventListener('click', ()=>{
-      const stamp = getCurrentTimeString();
-      const toInsert = `[${stamp}] `;
-      const start = notes.selectionStart || notes.value.length;
-      const end = notes.selectionEnd || start;
-      notes.setRangeText(toInsert, start, end, 'end');
-      notes.focus();
-    });
-
-    // Optional: auto-save notes to localStorage to avoid losing work
-    setInterval(()=> {
-      try { localStorage.setItem('videoNotes', notes.value); } catch(e){}
-    }, 2000);
-    window.addEventListener('load', ()=>{
-      try { const saved = localStorage.getItem('videoNotes'); if (saved) notes.value = saved; } catch(e){}
-    });
-
-    // Helpful: if user pastes a YouTube short url like youtu.be/... without protocol
-    videoUrlInput.addEventListener('paste', (ev)=> {
-      // no change — just convenience
-    });
-
-    // Small UX: when clicking play/pause but no player loaded alert
-    function ensurePlayerExists() {
-      if (!isYouTube && !htmlVideo) {
-        alert('Load a video first (paste URL and click Load).');
-        return false;
-      }
-      return true;
-    }
-    // wrap the functions to check
-    const _playPause = playPause;
-    playPauseBtn.onclick = ()=> { if (ensurePlayerExists()) _playPause(); };
-    fwdBtn.onclick = ()=> { if (ensurePlayerExists()) seekBy(SEEK_STEP); };
-    backBtn.onclick = ()=> { if (ensurePlayerExists()) seekBy(-SEEK_STEP); };
-
-    // quick helper: allow pressing Enter in URL input to load
-    videoUrlInput.addEventListener('keydown', (e)=> {
-      if (e.key === 'Enter') { loadBtn.click(); }
-    });
-
-    // analyze: if user wants the same button to also insert names of actions into notes:
-    // This is already implemented via logToggle. When logToggle is ON, each action will append a line to notes with timestamp.
-    // Examples: [00:34] Play, [00:45] Forward 10s
-
-    // End of script
+    // ---------- End ----------
   </script>
 </body>
+
 </html>
